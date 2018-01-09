@@ -91,7 +91,7 @@ defmodule AvgdmgCalculator.Ruleset.FifthEd do
   {10, 6, "2d8+4", strategy: :advantage}
   """
 
-  @avgdmg_parse_re ~r/^(?|(?:1?d20)?\s*([+-]?\s*\d+)\s*(.+\d)|.*attack:\s*([+-]?\s*\d+)\s*to\s*hit\s*.*hit:\s*(?:\d+\s*)?\((.*)\)).*?(?:with (?:((?:dis)?adv)(?:antage)?))?\s*vs\.?\s*(\d+)(?:\-(\d+))?\s*(?:ac\s*)?$/i
+  @avgdmg_parse_re ~r/^(?|(?:1?d20)?\s*([+-]?\s*\d+)\s*(.+\d)|.*attack:\s*([+-]?\s*\d+)\s*to\s*hit\s*.*hit:\s*(?:\d+\s*)?\((.*)\)).*?(?:with (?:((?:dis)?adv)(?:antage)?))?\s*vs\.?\s*(\d+)(?:\-(\d*))?\s*(?:ac\s*)?$/i
 
   ["Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4 + 2) bludgeoning damage. vs 10", "+2", "1d4 + 2", "", "10"]
   def parse_for_avgdmg(to_parse) do
