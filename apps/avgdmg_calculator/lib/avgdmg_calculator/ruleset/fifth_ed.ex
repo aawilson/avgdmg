@@ -91,32 +91,41 @@ defmodule AvgdmgCalculator.Ruleset.FifthEd do
   {10, 6, "2d8+4", strategy: :advantage}
   """
 
-  @avgdmg_parse_re ~r/^(?|(?:1?d20)?\s*([+-]?\s*\d+)\s*(.+\d)|.*attack:\s*([+-]?\s*\d+)\s*to\s*hit\s*.*hit:\s*(?:\d+\s*)?\((.*)\)).*?(?:with (?:((?:dis)?adv)(?:antage)?))?\s*vs\.?\s*(\d+)\s*(?:ac\s*)?$/i
+  @avgdmg_parse_re ~r/^(?|(?:1?d20)?\s*([+-]?\s*\d+)\s*(.+\d)|.*attack:\s*([+-]?\s*\d+)\s*to\s*hit\s*.*hit:\s*(?:\d+\s*)?\((.*)\)).*?(?:with (?:((?:dis)?adv)(?:antage)?))?\s*vs\.?\s*(\d+)(?:\-(\d+))?\s*(?:ac\s*)?$/i
 
+  ["Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4 + 2) bludgeoning damage. vs 10", "+2", "1d4 + 2", "", "10"]
   def parse_for_avgdmg(to_parse) do
     case Regex.run(@avgdmg_parse_re, to_parse) do
-      [_, bonus, crit_multiplying_damage_dice, adv_or_disadv, ac] ->
+      [_ | rest] ->
+        {bonus, crit_multiplying_damage_dice, adv_or_disadv, ac_low, ac_high} = match_regex(rest)
         opts = case adv_or_disadv do
           "adv" -> [strategy: :advantage]
           "disadv" -> [strategy: :disadvantage]
           "" -> []
         end
 
-        [{ac, _}, {bonus, _}] = [ac, bonus]
+        [{ac_low, _}, {ac_high, _}, {bonus, _}] = [ac_low, ac_high, bonus]
         |> Enum.map(fn (arg) ->
           arg
           |> String.replace(~r/\s+/, "")
           |> Integer.parse
         end)
 
-        case [ac, bonus] do
-          [:error, _] -> {:error, "ac did not parse to an integer"}
-          [_, :error] -> {:error, "bonus did not parse to an integer"}
-          _ -> {ac, bonus, crit_multiplying_damage_dice, opts}
+        case Enum.any?([ac_low, ac_high, bonus], fn
+          :error -> true
+          _ -> false
+        end) do
+          true -> {:error, "one of #{ac_low}, #{ac_high} or #{bonus} failed to parse to an integer"}
+          false when ac_low == ac_high -> {ac_low, bonus, crit_multiplying_damage_dice, opts}
+          false -> {ac_low, ac_high, bonus, crit_multiplying_damage_dice, opts}
         end
       nil -> :nomatch
     end
   end
+
+  defp match_regex([bonus, crit_multiplying_damage_dice, adv_or_disadv, ac_low]), do: {bonus, crit_multiplying_damage_dice, adv_or_disadv, ac_low, ac_low}
+  defp match_regex([bonus, crit_multiplying_damage_dice, adv_or_disadv, ac_low, ""]), do: {bonus, crit_multiplying_damage_dice, adv_or_disadv, ac_low, ac_low}
+  defp match_regex([bonus, crit_multiplying_damage_dice, adv_or_disadv, ac_low, ac_high]), do: {bonus, crit_multiplying_damage_dice, adv_or_disadv, ac_low, ac_high}
 
   @doc """
   Calculate the expected mean of an arbitrarily large number of rolls against a
@@ -143,6 +152,12 @@ defmodule AvgdmgCalculator.Ruleset.FifthEd do
   """
   def avgdmg({ac, bonus, crit_multiplying_damage_dice, opts}) do
     avgdmg(ac, bonus, crit_multiplying_damage_dice, opts)
+  end
+
+  def avgdmg({ac_low, ac_high, bonus, crit_multiplying_damage_dice, opts}) do
+    Enum.map(ac_low..ac_high, fn (x)->
+      avgdmg(x, bonus, crit_multiplying_damage_dice, opts)
+    end)
   end
 
   def avgdmg(:error) do

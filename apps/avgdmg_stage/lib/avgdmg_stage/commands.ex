@@ -27,7 +27,15 @@ defmodule AvgdmgStage.Commands do
     case ruleset.parse_for_avgdmg(content) do
       :nomatch -> {msg, "Failed to parse target string `#{content}`"}
       {:error, err} -> {msg, "Target string parse resulted in error: `#{err}`"}
-      parsed -> {msg, "Average damage for `#{content}`:\n`#{ruleset.avgdmg(parsed)}`"}
+      parsed ->
+        to_print = case ruleset.avgdmg(parsed) do
+          parsed when is_list(parsed) ->
+            parsed
+            |> Enum.map(fn i -> "#{i}" end)
+            |> Enum.join(", ")
+          parsed -> parsed
+        end
+        {msg, "Average damage for `#{content}`:\n`#{to_print}`"}
     end
   end
 

@@ -33,5 +33,6 @@ defmodule AvgdmgCalculator.Ruleset.FifthEdTest do
 
   test "avgdmg" do
     assert AvgdmgCalculator.Ruleset.FifthEd.avgdmg(20, 0, "1") == Decimal.add(Decimal.new(0.05), Decimal.new(0.05))
+    assert Enum.map(AvgdmgCalculator.Ruleset.FifthEd.avgdmg({6, 12, 1, "1d6", []}), fn (i) -> "#{i}" end) == ["2.975", "2.800", "2.625", "2.450", "2.275", "2.100", "1.925"]
   end
 end
