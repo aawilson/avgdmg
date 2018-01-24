@@ -10,7 +10,7 @@ defmodule AvgdmgDiscord.Application do
       {AvgdmgDiscord.Poster, %{genstage_opts: [subscribe_to: [AvgdmgDiscord.App.Worker]]}},
     ]
 
-    opts = [strategy: :one_for_one, name: AvgdmgDiscord.Supervisor]
+    opts = [strategy: :rest_for_one, name: AvgdmgDiscord.Supervisor]
 
     Supervisor.start_link(children, opts)
   end
