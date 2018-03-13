@@ -1,0 +1,189 @@
+!!!
+def get_val(token) do
+  case :lists.flatten(token) do
+    [] -> nil
+    r -> hd r
+  end
+end
+
+def get_val_tuplelist(kwlist) when length(kwlist) == 0 do
+  []
+end
+
+def get_val_tuplelist(kwlist) when is_tuple(hd(kwlist)) do
+  kwlist
+end
+
+def get_val_tuplelist(kwlist) do
+  kwlist |> hd |> get_val_tuplelist
+end
+
+defmacro to_i() do
+  quote do
+    _ = var!(string_values)
+    _ = var!(values)
+    state = var!(state)
+    rule = var!(rule)
+
+    {int, _} = Integer.parse(nosep(to_string(rule)))
+    {:ok, state, int}
+  end
+end
+
+defmacro to_s() do
+  quote do
+    _ = var!(string_values)
+    _ = var!(values)
+    state = var!(state)
+    rule = var!(rule)
+    {:ok, state, to_string(rule)}
+  end
+end
+
+defmacro to_s_nosep() do
+  quote do
+    _ = var!(string_values)
+    _ = var!(values)
+    state = var!(state)
+    rule = var!(rule)
+    {:ok, state, nosep(to_string(rule))}
+  end
+end
+
+def nosep(string_input) do
+  String.replace(string_input, ~r/[\s,]+/, "")
+  |> String.downcase
+end
+
+!!!
+
+COMMA = SWS "," SWS
+CR = %x0D
+CRLF = CR LF
+DIGIT = %x30-39
+DQUOTE = %x22
+HTAB = %x09
+LF = %x0A
+LWS = [*WSP CRLF] 1*WSP
+MINUS = "-"
+PLUS = "+"
+SP = %x20
+SWS = [LWS]
+WSP = SP / HTAB
+
+optsignint = *((PLUS / MINUS) SWS) 1*DIGIT
+
+signint = ((PLUS / MINUS) SWS) 1*DIGIT
+firstdie = optsignint [ "d" 1*DIGIT ]
+successivedie = signint [ "d" 1*DIGIT ]
+dice = firstdie *(*LWS successivedie) !!! to_s_nosep() !!!
+hitbonus = optsignint !!! to_i() !!!
+
+command = attacks LWS [options LWS] ac !!!
+  _ = {rule, string_values}
+  [attacks, _, opts, ac] = values
+  attacks = get_val_tuplelist(attacks)
+  opts = get_val_tuplelist(opts)
+  ac = get_val(ac)
+  {:ok, state, %{attacks: attacks, opts: opts, ac: ac}}
+!!!
+
+attacks = simpleattack *(COMMA simpleattack) !!!
+  _ = {rule, string_values}
+  [firstattack, otherattacks] = values
+  otherattacks = :lists.flatten(for i <- otherattacks, do: i |> Enum.reverse |> hd)
+  firstattack = get_val(firstattack)
+  {:ok, state, [firstattack | otherattacks]}
+!!!
+
+simpleattack = [hitbonus LWS] dice !!!
+  _ = {rule, string_values}
+  [hitbonus, dice] = values
+  hitbonus_or_zero = case get_val(hitbonus) do
+    nil -> 0
+    x when is_integer(x) -> x
+  end
+  {:ok, state, {hitbonus_or_zero, get_val(dice)}}
+!!!
+
+options = "with" LWS option *(LWS option) !!!
+  _ = {rule, string_values}
+  [_, _, firstopt, otheropts] = values
+  firstopt = get_val(firstopt)
+  otheropts = :lists.flatten(for i <- otheropts, do: i |> Enum.reverse |> hd)
+  opts = Keyword.merge([firstopt], otheropts)
+  {:ok, state, opts}
+!!!
+
+option = advantage / reroll / threat / noncrit / lucky / elvishaccuracy
+
+advantage = [ "dis" ] "adv" [ "antage" ] !!!
+  _ = {rule, string_values}
+  [dis, _, _] = values
+  opt = case get_val(dis) do
+    nil -> {:advantage, :advantage}
+    _ -> {:advantage, :disadvantage}
+  end
+  {:ok, state, opt}
+!!!
+
+reroll = "reroll" LWS 1*DIGIT !!!
+  _ = {rule, values}
+  [_, _, digits] = string_values
+  {reroll_on, _} = digits |> to_string |> Integer.parse
+  case reroll_on do
+    x when x in 1..20 -> {:ok, state, {:reroll, x}}
+    _ -> {:error, "reroll has to be a number from 1 to 20 when specified"}
+  end
+!!!
+
+threat = "threat" LWS 1*DIGIT !!!
+  _ = {rule, values}
+  [_, _, digits] = string_values
+  {threat_on, _} = digits |> to_string |> Integer.parse
+  case threat_on do
+    x when x in 1..20 -> {:ok, state, {:threat, x}}
+    _ -> {:error, "threat has to be a number from 1 to 20 when specified"}
+  end
+!!!
+
+noncrit = "noncrit" LWS dice !!!
+  _ = {rule, string_values}
+  [_, _, [[dice]]] = values
+
+  {:ok, state, {:non_crit_multiplying_damage_dice, dice}}
+!!!
+
+lucky = "lucky" !!!
+  _ = {rule, string_values, values}
+  {:ok, state, {:lucky, true}}
+!!!
+
+elvishaccuracy = "elvishaccuracy" !!!
+  _ = {rule, string_values, values}
+  {:ok, state, {:elvishaccuracy, true}}
+!!!
+
+ac = "vs" LWS (singleac / rangeac) [LWS "ac"] !!!
+  _ = {rule, string_values}
+  [_, _, single_or_range_ac, _] = values
+  single_or_range_ac = get_val(single_or_range_ac)
+
+  ac = case String.split(single_or_range_ac, "-") do
+    [x] ->
+      {x_parsed, _} = Integer.parse(x)
+      x_parsed..x_parsed
+    [x, ""] ->
+      {x_parsed, _} = Integer.parse(x)
+      x_parsed..x_parsed
+    [x, y] ->
+      {x_parsed, _} = Integer.parse(x)
+      {y_parsed, _} = Integer.parse(y)
+      x_parsed..y_parsed
+  end
+  {:ok, state, ac}
+!!!
+
+singleac = 1*DIGIT ["-"] !!! to_s_nosep() !!!
+
+rangeac = 1*DIGIT "-" *DIGIT !!! to_s_nosep() !!!
