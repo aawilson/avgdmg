@@ -40,6 +40,7 @@ defmodule AvgdmgCalculator.Dice do
         sign_to_int(sign) * elem(Integer.parse(const), 0)
       [_, sign, num, _, size] ->
         %{sign: sign_to_int(sign), num: elem(Integer.parse(num), 0), size: elem(Integer.parse(size), 0)}
+      nil -> :nomatch
     end)
   end
 

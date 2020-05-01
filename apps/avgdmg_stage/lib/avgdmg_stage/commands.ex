@@ -1,4 +1,12 @@
 defmodule AvgdmgStage.Commands do
+  def parse_command("!roll" <> rest) do
+    _roll_command(rest)
+  end
+
+  def parse_command("!r" <> rest) do
+    _roll_command(rest)
+  end
+
   def parse_command("!ping" <> rest) do
     {:ping, String.trim(rest)}
   end
@@ -17,6 +25,21 @@ defmodule AvgdmgStage.Commands do
 
   def parse_command(no_command) do
     {:no_command, String.trim(no_command)}
+  end
+
+  def to_results({:roll, %{msg: msg, content: content}}, _ruleset) do
+    to_print = content
+    |> String.split(",")
+    |> Enum.map(fn elem ->
+        case AvgdmgCalculator.Dice.parse(String.trim(elem)) do
+          :nomatch -> "(did not parse)"
+          {:error, err} -> "(error: #{err})"
+          res -> res
+            |> AvgdmgCalculator.Dice.roll
+        end
+      end)
+    |> Enum.join(", ")
+    {msg, "Results for `#{content}`: `#{to_print}`"}
   end
 
   def to_results({:ping, %{msg: msg}}, _ruleset) do
@@ -52,5 +75,9 @@ defmodule AvgdmgStage.Commands do
     ```
     """
     }
+  end
+
+  defp _roll_command(rest) do
+    {:roll, String.trim(rest)}
   end
 end
